@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 let productSchema = new mongoose.Schema({
   name: { type: String, },
-  price: Number,
-  description: String,
+  price: { type: String, },
+  description: { type: String, },
   createdOn: { type: Date, default: Date.now },
   unit: { type: String },
   category: { type: String,  },

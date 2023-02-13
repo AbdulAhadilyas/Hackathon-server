@@ -6,14 +6,14 @@ import cookieParser from "cookie-parser";
 import autRouter from "./routes/authRoute/authRoute.mjs"
 import ProductRouter from "./routes/productsRoutes/ProductRouter.mjs"
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 5001;  
 
 app.use(express.json());
 app.use(cookieParser());
 
 app.use(
   cors({
-    origin: ["http://localhost:3001", "*"],
+    origin: ["http://localhost:3000", "*"],
     credentials: true,
   })
 );

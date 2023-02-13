@@ -11,7 +11,25 @@ const storageConfig = multer.diskStorage({
     cb(null, `${new Date().getTime()}-${file.originalname}`);
   },
 });
-const upload = multer({ storage: storageConfig });
+
+let uploadMiddleware = multer({
+  storage: storageConfig,
+
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype == "image/png" ||
+      file.mimetype == "image/jpg" ||
+      file.mimetype == "image/jpeg"
+    ) {
+      cb(null, true);
+    } else {
+      // this is requesting in uploadMiddleware body and you can send error
+      req.fileValidationError = "Forbidden extension";
+      return cb(null, false, req.fileValidationError);
+      //   return cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
+    }
+  },
+});
 
 let serviceAccount = {
   type: "service_account",
@@ -35,67 +53,79 @@ admin.initializeApp({
 });
 const bucket = admin.storage().bucket("gs://air-sysborg-9e768.appspot.com");
 
-router.post("/api/v1/product", upload.any(), (req, res) => {
-  const body = req.body;
-  // let signedUrls;
-  // bucket.upload(req.files[0].path, async (err, file, apiResponse) => {
-  //   if (!err) {
-  //     try {
-  //       signedUrls = await file.getSignedUrl({
-  //         action: "read",
-  //         expires: "03-09-2491",
-  //       });
-  //       fs.unlinkSync(req.files[0].path);
-  //     } catch (error) {}
-  //   } else {
-  //     console.log("err: ", err);
-  //     res.status(500).send();
-  //   }
-  // });
-  if (
-    // validation
-    !body.desp ||
-    !body.price ||
-    !body.itemName ||
-    // !body.category ||
-    !body.unitName
-  ) {
-    res.status(400).send({
-      message: "required parameters missing",
-    });
-    return;
-  }
-
-  products.push({
-    id: `${new Date().getTime()}`,
-    name: body.itemName,
-    price: body.price,
-    description: body.desp,
-    unit: body.unitName,
-    url:signedUrls
-    // category: body.category,
-  });
-
-  productModel.create(
-    {
-      name: body.name,
-      price: body.price,
-      description: body.description,
-    },
-    (err, saved) => {
-      if (!err) { 
-        console.log(saved);
-
-        res.send({
-          message: "product added successfully",
-        });
-      } else {
-        res.status(500).send({
-          message: "server error",
-        });
-      }
+router.post("/api/v1/product", uploadMiddleware.any(), async (req, res) => {
+  try {
+    if (req.fileValidationError) {
+      res
+        .status(400)
+        .send({ message: "Only .png, .jpg and .jpeg format allowed!" });
+      return;
     }
-  );
+
+    if (!req.files[0]) throw new Error("please upload product Image");
+
+    if (req.files[0].size >= 1000000) throw new Error("only accept 1 Mb Image");
+    bucket.upload(
+      req.files[0].path,
+      {
+        destination: `SaylaniHacthon/${req.files[0].filename}`, // give destination name if you want to give a certain name to file in bucket, include date to make name unique otherwise it will replace previous file with the same name
+      },
+      function (err, file, apiResponse) {
+        if (!err) {
+          file
+            .getSignedUrl({
+              action: "read",
+              expires: "03-09-2999",
+            })
+            .then((urlData, err) => {
+              if (!err) {
+                fs.unlink(req.files[0].path, (err) => {
+                  if (err) {
+                    console.error(err, "dd");
+                    return;
+                  } else {
+                    console.log("Delete sus");
+                  }
+                });
+
+                productModel.create(
+                  {
+                    name: req.body.itemName,
+                    description: req.body.desp,
+                    price: req.body.price,
+                    unit: req.body.unitName,
+                    url: urlData[0],
+                    category: req.body.category,
+                  },
+                  (err, saved) => {
+                    if (!err) {
+                      console.log("saved: ", saved);
+
+                      res.send({
+                        message: "Product added successfully",
+                      });
+                    } else {
+                      console.log("err: ", err);
+                      res.status(500).send({
+                        message: "server error",
+                      });
+                    }
+                  }
+                );
+              }
+            });
+        } else {
+          console.log("err: ", err);
+          res.status(500).send({ message: err });
+        }
+      }
+    );
+  } catch (error) {
+    res.status(500).send({
+      message: error.message,
+    });
+    console.error(error.message);
+  }
 });
 
 router.get("/api/v1/products", (req, res) => {
