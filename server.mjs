@@ -13,7 +13,7 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "*"],
+    origin: ["http://localhost:3000","https://saylani-store-9b139.web.app", "*"],
     credentials: true,
   })
 );
